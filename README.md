@@ -1,3 +1,6 @@
+# rtw88 (in-tree)
+This is a fork with modified Makefile and new Kconfig to allow for in-tree driver installation. Just clone the repo in drivers/net/wireless/realtek
+
 # rtw88 downstream 🐧
 ### This is a downstream repo with a primary purpose of supporting development, testing and maintenance for the Realtek rtw88 series of WiFi 5 drivers in the Linux kernel.
 
