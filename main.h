@@ -36,6 +36,16 @@
 #define RHEL_RELEASE_VERSION(a, b) a<<8 & b
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+/* Taken from kernel 6.18.1: include/linux/device/devres.h
+ * Removed size_dup(...) to support kernels older than 5.15. */
+static inline void *devm_kmemdup_array(struct device *dev, const void *src,
+				       size_t n, size_t size, gfp_t flags)
+{
+	return devm_kmemdup(dev, src, (size * n), flags);
+}
+#endif
+
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0))
 /**
  * abs_diff - return absolute value of the difference between the arguments
@@ -188,6 +198,7 @@ extern const struct ieee80211_ops rtw_ops;
 
 struct rtw_dev;
 struct rtw_debugfs;
+struct rtw_tx_desc;
 
 enum rtw_hci_type {
 	RTW_HCI_TYPE_PCIE,
@@ -1046,7 +1057,7 @@ struct rtw_chip_ops {
 	/* for USB/SDIO only */
 	void (*fill_txdesc_checksum)(struct rtw_dev *rtwdev,
 				     struct rtw_tx_pkt_info *pkt_info,
-				     u8 *txdesc);
+				     struct rtw_tx_desc *txdesc);
 
 	/* for coex */
 	void (*coex_set_init)(struct rtw_dev *rtwdev);
@@ -2367,7 +2378,7 @@ enum nl80211_band rtw_hw_to_nl80211_band(enum rtw_supported_band hw_band)
 }
 
 void rtw_set_rx_freq_band(struct rtw_rx_pkt_stat *pkt_stat, u8 channel);
-void rtw_set_dtim_period(struct rtw_dev *rtwdev, int dtim_period);
+void rtw_set_dtim_period(struct rtw_dev *rtwdev, u8 dtim_period);
 void rtw_get_channel_params(struct cfg80211_chan_def *chandef,
 			    struct rtw_channel_params *ch_param);
 bool check_hw_ready(struct rtw_dev *rtwdev, u32 addr, u32 mask, u32 target);

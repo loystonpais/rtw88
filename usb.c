@@ -36,7 +36,7 @@ static void rtw_usb_fill_tx_checksum(struct rtw_usb *rtwusb,
 
 	le32p_replace_bits(&tx_desc->w7, agg_num, RTW_TX_DESC_W7_DMA_TXAGG_NUM);
 	pkt_info.pkt_offset = le32_get_bits(tx_desc->w1, RTW_TX_DESC_W1_PKT_OFFSET);
-	rtw_tx_fill_txdesc_checksum(rtwdev, &pkt_info, skb->data);
+	rtw_tx_fill_txdesc_checksum(rtwdev, &pkt_info, tx_desc);
 }
 
 static void rtw_usb_reg_sec(struct rtw_dev *rtwdev, u32 addr, __le32 *data)
@@ -503,6 +503,7 @@ static int rtw_usb_write_data(struct rtw_dev *rtwdev,
 			      u8 *buf)
 {
 	const struct rtw_chip_info *chip = rtwdev->chip;
+	struct rtw_tx_desc *pkt_desc;
 	struct sk_buff *skb;
 	unsigned int size;
 	u8 qsel;
@@ -517,10 +518,10 @@ static int rtw_usb_write_data(struct rtw_dev *rtwdev,
 
 	skb_reserve(skb, chip->tx_pkt_desc_sz);
 	skb_put_data(skb, buf, size);
-	skb_push(skb, chip->tx_pkt_desc_sz);
-	memset(skb->data, 0, chip->tx_pkt_desc_sz);
-	rtw_tx_fill_tx_desc(rtwdev, pkt_info, skb);
-	rtw_tx_fill_txdesc_checksum(rtwdev, pkt_info, skb->data);
+	pkt_desc = skb_push(skb, chip->tx_pkt_desc_sz);
+	memset(pkt_desc, 0, chip->tx_pkt_desc_sz);
+	rtw_tx_fill_tx_desc(rtwdev, pkt_info, pkt_desc);
+	rtw_tx_fill_txdesc_checksum(rtwdev, pkt_info, pkt_desc);
 
 	ret = rtw_usb_write_port(rtwdev, qsel, skb,
 				 rtw_usb_write_port_complete, skb);
@@ -580,15 +581,15 @@ static int rtw_usb_tx_write(struct rtw_dev *rtwdev,
 	struct rtw_usb *rtwusb = rtw_get_usb_priv(rtwdev);
 	const struct rtw_chip_info *chip = rtwdev->chip;
 	struct rtw_usb_tx_data *tx_data;
-	u8 *pkt_desc;
+	struct rtw_tx_desc *pkt_desc;
 	int ep;
 
 	pkt_info->qsel = rtw_usb_tx_queue_mapping_to_qsel(skb);
 	pkt_desc = skb_push(skb, chip->tx_pkt_desc_sz);
 	memset(pkt_desc, 0, chip->tx_pkt_desc_sz);
 	ep = qsel_to_ep(rtwusb, pkt_info->qsel);
-	rtw_tx_fill_tx_desc(rtwdev, pkt_info, skb);
-	rtw_tx_fill_txdesc_checksum(rtwdev, pkt_info, skb->data);
+	rtw_tx_fill_tx_desc(rtwdev, pkt_info, pkt_desc);
+	rtw_tx_fill_txdesc_checksum(rtwdev, pkt_info, pkt_desc);
 	tx_data = rtw_usb_get_tx_data(skb);
 	tx_data->sn = pkt_info->sn;
 
@@ -623,6 +624,7 @@ static void rtw_usb_rx_handler(unsigned long shut_up_gcc)
 			  IEEE80211_MAX_MPDU_LEN_VHT_11454;
 	u32 pkt_offset, next_pkt, skb_len;
 	u8 *rx_desc;
+	u8 *rx_buf;
 	int limit;
 
 	for (limit = 0; limit < 200; limit++) {
@@ -639,8 +641,9 @@ static void rtw_usb_rx_handler(unsigned long shut_up_gcc)
 		rx_desc = rx_skb->data;
 
 		do {
-			rtw_rx_query_rx_desc(rtwdev, rx_desc, &pkt_stat,
-					     &rx_status);
+			rx_buf = rx_desc + pkt_desc_sz;
+			rtw_rx_query_rx_desc(rtwdev, rx_desc, rx_buf,
+					     &pkt_stat, &rx_status);
 			pkt_offset = pkt_desc_sz + pkt_stat.drv_info_sz +
 				     pkt_stat.shift;
 
